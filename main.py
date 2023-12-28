@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 
 # https://distill.pub/2020/growing-ca/
 
@@ -41,14 +41,27 @@ def perceive(state_grid, in_channels):
     return conv(state_grid)
 
 
+def update(perception_grid):
+    _, out_channels, height, width = perception_grid.shape
+    in_features = out_channels * height * width
+    perception_vectors = perception_grid.view(-1, in_features)
+    dense = nn.Linear(in_features, 128)
+    x = dense(perception_vectors)
+    x = F.relu(x)
+    dense2 = nn.Linear(128, 16)
+    nn.init.constant_(dense2.weight, 0.0)
+    ds = dense2(x)
+    c = 3
+
 def main():
     in_channels = 16
     # [batch_size, channels, height, width]
     height = 3 * 4
     width = 3 * 4
     state_grid = torch.randn(1, in_channels, height, width)
-    grads = perceive(state_grid, in_channels).detach().numpy()
-    print(grads.shape)
+    perception_grid = perceive(state_grid, in_channels)#.detach().numpy()
+    #update(perception_grid)
+    # (1, 48, 10, 10)
 
 
 main()
