@@ -32,6 +32,7 @@ def perceive(state_grid, in_channels):
     conv = nn.Conv2d(
         in_channels=in_channels,
         out_channels=3*in_channels,
+        padding=1,
         kernel_size=3,
         bias=False,
         stride=1,
@@ -41,17 +42,32 @@ def perceive(state_grid, in_channels):
     return conv(state_grid)
 
 
-def update(perception_grid):
-    _, out_channels, height, width = perception_grid.shape
-    in_features = out_channels * height * width
-    perception_vectors = perception_grid.view(-1, in_features)
-    dense = nn.Linear(in_features, 128)
-    x = dense(perception_vectors)
+def convert_perception_grid(perception_grid):
+    perception_vectors = {}
+    for input_channel_filter_combination in perception_grid[0]:
+        for i, row in enumerate(input_channel_filter_combination):
+            for j, val in enumerate(row):
+                position = (i, j)
+                perception_vectors.setdefault(position, []).append(float(val))
+    return torch.tensor(list(perception_vectors.values()), dtype=torch.float32)
+
+
+def update_1(perception_vector, out_features):
+    dense_1 = nn.Linear(len(perception_vector), out_features)
+    x = dense_1(perception_vector)
     x = F.relu(x)
-    dense2 = nn.Linear(128, 16)
-    nn.init.constant_(dense2.weight, 0.0)
-    ds = dense2(x)
-    c = 3
+    dense_2 = nn.Linear(out_features, 16)
+    nn.init.constant_(dense_2.weight, 0.0)
+    ds = dense_2(x)
+    return ds
+
+
+def update_2(perception_vector, dense_1, dense_2):
+    x = dense_1(perception_vector)
+    x = F.relu(x)
+    ds = dense_2(x)
+    return ds
+
 
 def main():
     in_channels = 16
@@ -59,9 +75,20 @@ def main():
     height = 3 * 4
     width = 3 * 4
     state_grid = torch.randn(1, in_channels, height, width)
-    perception_grid = perceive(state_grid, in_channels)#.detach().numpy()
-    #update(perception_grid)
-    # (1, 48, 10, 10)
+    perception_grid = perceive(state_grid, in_channels)
+    perception_grid = convert_perception_grid(perception_grid)
+
+    out_features = 128
+    dense_1 = nn.Linear(perception_grid.shape[1], out_features)
+    dense_2 = nn.Linear(out_features, 16)
+    nn.init.constant_(dense_2.weight, 0.0)
+
+    ds_grid_1 = []
+    ds_grid_2 = []
+    for perception_vector in perception_grid:
+        ds_grid_1.append(update_1(perception_vector, out_features))
+        ds_grid_2.append(update_2(perception_vector, dense_1, dense_2))
+    x = 3
 
 
 main()
