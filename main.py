@@ -42,31 +42,30 @@ def perceive(state_grid, in_channels):
     return conv(state_grid)
 
 
-def convert_perception_grid(perception_grid):
-    perception_vectors = {}
-    for input_channel_filter_combination in perception_grid[0]:
-        for i, row in enumerate(input_channel_filter_combination):
-            for j, val in enumerate(row):
-                position = (i, j)
-                perception_vectors.setdefault(position, []).append(float(val))
-    return torch.tensor(list(perception_vectors.values()), dtype=torch.float32)
+class Update(nn.Module):
+    def __init__(self):
+        super(Update, self).__init__()
+        self.dense1 = nn.Linear(in_features=48, out_features=128)
+        self.dense2 = nn.Linear(in_features=128, out_features=16)
+        nn.init.zeros_(self.dense2.weight)
+
+    def forward(self, x):
+        x = self.dense1(x)
+        x = F.relu(x)
+        ds = self.dense2(x)
+        return ds
 
 
-def update_1(perception_vector, out_features):
-    dense_1 = nn.Linear(len(perception_vector), out_features)
-    x = dense_1(perception_vector)
-    x = F.relu(x)
-    dense_2 = nn.Linear(out_features, 16)
-    nn.init.constant_(dense_2.weight, 0.0)
-    ds = dense_2(x)
-    return ds
+def stochastic_update(state_grid, ds_grid):
+    rand_mask = (torch.rand(*state_grid.size(), device=state_grid.device) < 0.5).float()
+    ds_grid = ds_grid * rand_mask
+    return state_grid + ds_grid
 
 
-def update_2(perception_vector, dense_1, dense_2):
-    x = dense_1(perception_vector)
-    x = F.relu(x)
-    ds = dense_2(x)
-    return ds
+def alive_masking(state_grid):
+    alive = (F.max_pool2d(state_grid[3].unsqueeze(0), kernel_size=3, stride=1, padding=1) > 0.1).float()
+    state_grid = state_grid * alive
+    return state_grid
 
 
 def main():
@@ -76,19 +75,12 @@ def main():
     width = 3 * 4
     state_grid = torch.randn(1, in_channels, height, width)
     perception_grid = perceive(state_grid, in_channels)
-    perception_grid = convert_perception_grid(perception_grid)
-
-    out_features = 128
-    dense_1 = nn.Linear(perception_grid.shape[1], out_features)
-    dense_2 = nn.Linear(out_features, 16)
-    nn.init.constant_(dense_2.weight, 0.0)
-
-    ds_grid_1 = []
-    ds_grid_2 = []
-    for perception_vector in perception_grid:
-        ds_grid_1.append(update_1(perception_vector, out_features))
-        ds_grid_2.append(update_2(perception_vector, dense_1, dense_2))
-    x = 3
+    perception_grid = perception_grid[0].permute(1, 2, 0).view(-1, 48)
+    update = Update()
+    ds_grid = update(perception_grid)
+    ds_grid = ds_grid.view(width, height, 16).permute(2, 0, 1)
+    state_grid = stochastic_update(state_grid[0], ds_grid)
+    state_grid = alive_masking(state_grid)
 
 
 main()
