@@ -1,6 +1,13 @@
 import torch
+import random
 import torch.nn as nn
 import torch.nn.functional as F
+
+from torchvision import transforms
+from torch import optim
+
+from PIL import Image
+
 
 # https://distill.pub/2020/growing-ca/
 
@@ -74,14 +81,46 @@ class Model(nn.Module):
         return state_grid.unsqueeze(0)
 
 
-def main2():
+def load_image():
+    image = Image.open("lizard.png").convert('RGBA')
+    transform = transforms.ToTensor()
+    return transform(image)
+
+
+def init_state_grid(in_channels, height, width):
+    rgb_channels = torch.zeros(3, height, width)
+    non_rgb_channel = torch.zeros(height, width)
+    seed_y = int(height / 2)
+    seed_x = int(width / 2)
+    non_rgb_channel[seed_y][seed_x] = 1
+    non_rgb_channel = non_rgb_channel.unsqueeze(0)
+    non_rgb_channels = non_rgb_channel.repeat(in_channels - 3, 1, 1)
+    return torch.cat((rgb_channels, non_rgb_channels), dim=0).unsqueeze(0)
+
+
+def loop(h, w, num_epochs):
+    target = load_image()[:, 0:h, 0:w]
+    _, height, width = target.shape
+    target = target.unsqueeze(0)
+
     in_channels = 16
-    height = 3 * 4
-    width = 3 * 4
-    state_grid = torch.randn(1, in_channels, height, width)
+    state_grid = init_state_grid(in_channels, height, width)
     model = Model(in_channels, width, height)
-    out = model(state_grid)
-    v = 2
+
+    mse = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters())
+    for epoch in range(num_epochs):
+        optimizer.zero_grad()
+
+        out = state_grid
+        for _ in range(random.randint(64, 96)):
+            out = model(out)
+        rgba = out[:, 0:4, :, :]
+        loss = mse(rgba, target)
+        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+        loss.backward()
+        optimizer.step()
 
 
-main2()
+loop(24, 24, 20)
+loop(200, 200, 40)
