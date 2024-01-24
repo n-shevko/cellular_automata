@@ -1,12 +1,17 @@
-import torch
 import random
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from torchvision import transforms
 from torch import optim
+from torchvision import transforms
 
 from PIL import Image
+
+from utils import *
+
+
+torch.set_num_threads((torch.get_num_threads() * 2) - 1)
 
 
 # https://distill.pub/2020/growing-ca/
@@ -81,10 +86,11 @@ class Model(nn.Module):
         return state_grid.unsqueeze(0)
 
 
-def load_image():
+def load_image(height, width):
     image = Image.open("lizard.png").convert('RGBA')
+    resized_image = image.resize((width, height))
     transform = transforms.ToTensor()
-    return transform(image)
+    return transform(resized_image)
 
 
 def init_state_grid(in_channels, height, width):
@@ -98,9 +104,11 @@ def init_state_grid(in_channels, height, width):
     return torch.cat((rgb_channels, non_rgb_channels), dim=0).unsqueeze(0)
 
 
-def loop(h, w, num_epochs):
-    target = load_image()[:, 0:h, 0:w]
-    _, height, width = target.shape
+def loop(height, width, num_epochs):
+    run_id = generate_run_id()
+    os.makedirs(os.path.join(FRAMES_FOLDER, run_id), exist_ok=True)
+
+    target = load_image(height, width)
     target = target.unsqueeze(0)
 
     in_channels = 16
@@ -109,18 +117,22 @@ def loop(h, w, num_epochs):
 
     mse = nn.MSELoss()
     optimizer = optim.Adam(model.parameters())
+    frame_id = 0
     for epoch in range(num_epochs):
         optimizer.zero_grad()
 
         out = state_grid
+        save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
         for _ in range(random.randint(64, 96)):
             out = model(out)
+            frame_id += 1
+            save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
         rgba = out[:, 0:4, :, :]
         loss = mse(rgba, target)
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
         loss.backward()
         optimizer.step()
+    generate_video(run_id)
 
 
-loop(24, 24, 20)
-loop(200, 200, 40)
+loop(32, 32, 5000)
