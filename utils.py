@@ -15,6 +15,11 @@ def generate_run_id():
         return '1'
 
 
+# def save_frame(name, image):
+#     image_pil = transforms.ToPILImage()(image)
+#     image_pil.save(f'/home/nikos/{name}.png', 'PNG')
+
+
 def save_frame(run_id, frame_id, image):
     image_pil = transforms.ToPILImage()(image)
     image_pil.save(os.path.join(FRAMES_FOLDER, run_id, f'{frame_id}.png'), 'PNG')
@@ -24,4 +29,3 @@ def generate_video(run_id):
     os.chdir(os.path.join(FRAMES_FOLDER, run_id))
     out = os.path.join(FRAMES_FOLDER, run_id + '.mp4')
     os.system(f'ffmpeg -framerate 30 -i %d.png -c:v libx264 -pix_fmt yuv420p {out}')
-
