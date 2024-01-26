@@ -195,9 +195,9 @@ def make_video():
 
 #make_video()
 
-# from client import Session
-#
-# with Session() as s:
-#     x = s.take()
-#     b = 3
+from client import Session
+
+with Session() as s:
+    x = s.take('test')
+    b = 3
 

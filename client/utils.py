@@ -122,4 +122,4 @@ def get_use(conf):
 ORIG = get_config()
 CONFIG = ORIG[get_use(ORIG)]
 k = 'colab_pkey' if colab else 'local_pkey'
-PKEY = paramiko.RSAKey.from_private_key(open(CONFIG['pkey']))
+PKEY = paramiko.RSAKey.from_private_key(open(CONFIG[k]))
