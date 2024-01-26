@@ -92,11 +92,17 @@ def to_db_key(value: Any) -> str:
     return dumps(value, sort_keys=True, cls=CustomEncoder)
 
 
+local = os.path.exists('/home/nikos/seafile')
+
+
 def get_config():
-    path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'config.json'
-    )
+    if local:
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'config.json'
+        )
+    else:
+        path = '/content/drive/MyDrive/config.json'
     with open(path, 'r') as f:
         config = json.loads(f.read())
     return config
@@ -105,7 +111,7 @@ def get_config():
 ORIG = get_config()
 use = ORIG.get('use')
 if not use:
-    if os.path.exists('/home/nikos/seafile'):
+    if local:
         use = 'local'
     else:
         use = 'remote'
