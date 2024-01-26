@@ -1,0 +1,30 @@
+# /etc/mysql/conf.d/   version 8.0
+
+[mysqld]
+
+innodb_buffer_pool_size = 15G
+innodb_log_file_size = 2G
+innodb_flush_log_at_trx_commit = 1
+innodb_flush_method = O_DIRECT
+
+
+max_connections = 1000
+thread_cache_size = 50
+
+table_open_cache = 2000
+open_files_limit = 4000
+
+slow_query_log = 1
+long_query_time = 2
+
+init_connect='SET NAMES utf8'
+character-set-server = utf8
+collation-server=utf8_unicode_ci
+bind-address = 0.0.0.0
+wait_timeout=2147483
+
+[client]
+default-character-set = utf8
+
+[mysql]
+default-character-set = utf8

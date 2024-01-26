@@ -153,6 +153,7 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 .frames/
+client/config.json
 
 
 # PyCharm
