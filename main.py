@@ -193,5 +193,11 @@ def make_video():
     generate_video(run_id)
     v = 4
 
-make_video()
+#make_video()
+
+# from client import Session
+#
+# with Session() as s:
+#     x = s.take()
+#     b = 3
 

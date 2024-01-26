@@ -92,28 +92,34 @@ def to_db_key(value: Any) -> str:
     return dumps(value, sort_keys=True, cls=CustomEncoder)
 
 
-local = os.path.exists('/home/nikos/seafile')
+colab = not os.path.exists('/home/nikos/seafile')
 
 
 def get_config():
-    if local:
+    if colab:
+        path = '/content/drive/MyDrive/config.json'
+    else:
         path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'config.json'
         )
-    else:
-        path = '/content/drive/MyDrive/config.json'
     with open(path, 'r') as f:
         config = json.loads(f.read())
     return config
 
 
-ORIG = get_config()
-use = ORIG.get('use')
-if not use:
-    if local:
-        use = 'local'
+def get_use(conf):
+    use = conf.get('use')
+    if not use:
+        if colab:
+            return 'remote'
+        else:
+            return 'local'
     else:
-        use = 'remote'
-CONFIG = ORIG[use]
+        return use
+
+
+ORIG = get_config()
+CONFIG = ORIG[get_use(ORIG)]
+k = 'colab_pkey' if colab else 'local_pkey'
 PKEY = paramiko.RSAKey.from_private_key(open(CONFIG['pkey']))
