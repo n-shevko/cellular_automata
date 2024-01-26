@@ -99,5 +99,6 @@ def get_config():
     return config
 
 
-CONFIG = get_config()
-PKEY = paramiko.RSAKey.from_private_key(open(CONFIG['ftp']['pkey']))
+ORIG = get_config()
+CONFIG = ORIG[ORIG['use']]
+PKEY = paramiko.RSAKey.from_private_key(open(ORIG['pkey']))
