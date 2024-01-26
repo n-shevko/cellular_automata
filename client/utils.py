@@ -93,12 +93,21 @@ def to_db_key(value: Any) -> str:
 
 
 def get_config():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'config.json'
+    )
     with open(path, 'r') as f:
         config = json.loads(f.read())
     return config
 
 
 ORIG = get_config()
-CONFIG = ORIG[ORIG['use']]
-PKEY = paramiko.RSAKey.from_private_key(open(ORIG['pkey']))
+use = ORIG.get('use')
+if not use:
+    if os.path.exists('/home/nikos/seafile'):
+        use = 'local'
+    else:
+        use = 'remote'
+CONFIG = ORIG[use]
+PKEY = paramiko.RSAKey.from_private_key(open(CONFIG['pkey']))
