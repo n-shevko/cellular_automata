@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch import optim
 from torchvision import transforms
 
+from client import Session
 from datetime import datetime, timedelta
 from PIL import Image
 
@@ -94,8 +95,8 @@ class Model(nn.Module):
         return state_grid.unsqueeze(0)
 
 
-def load_image(height, width):
-    image = Image.open("lizard.png").convert('RGBA')
+def load_image(height, width, image_name):
+    image = Image.open(f"images/{image_name}.png").convert('RGBA')
     resized_image = image.resize((width, height))
     transform = transforms.ToTensor()
     return transform(resized_image)
@@ -111,15 +112,9 @@ def init_state_grid(in_channels, height, width):
     non_rgb_channels = non_rgb_channel.repeat(in_channels - 3, 1, 1)
     return torch.cat((rgb_channels, non_rgb_channels), dim=0).unsqueeze(0)
 
-#torch.set_printoptions(threshold=10_000)
-torch.set_printoptions(edgeitems=50, linewidth=200, precision=8, threshold=5000)
 
-
-def loop(height, width):
-    #run_id = generate_run_id()
-    #os.makedirs(os.path.join(FRAMES_FOLDER, run_id), exist_ok=True)
-
-    target = load_image(height, width)
+def loop(height, width, image):
+    target = load_image(height, width, image)
     target = target.unsqueeze(0)
 
     in_channels = 16
@@ -129,51 +124,43 @@ def loop(height, width):
         model = model.to('cuda')
     mse = nn.MSELoss()
     optimizer = optim.Adam(model.parameters())
-    frame_id = 0
     start = datetime.now()
 
-    rgba = state_grid[:, 0:4, :, :]
-    loss = mse(rgba, target)
-    while (datetime.now() - start) < timedelta(minutes=20) and round(loss.item(), 4) != 0:
+    last_loss = 100
+    last_steps = None
+    while round(last_loss, 4) > 0.001:
         optimizer.zero_grad()
-        out = state_grid
-        init_state_grid_val = state_grid.clone()
-        # save_frame('init_state_grid_val', init_state_grid_val[:, 0:4, :, :][0])
-        # save_frame('target', target[0])
-        #save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
-        for _ in range(random.randint(64, 96)):
-            before = out.clone()
+        out = state_grid.clone()
+        last_steps = random.randint(64, 96)
+        for _ in range(last_steps):
             out = model(out)
-            if before.sum() != 0 and out.sum() == 0:
-                out2 = model(before)
-                v = 3
-            frame_id += 1
-            #save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
         rgba = out[:, 0:4, :, :]
         loss = mse(rgba, target)
-        print(f'Timedelta {(datetime.now() - start)}, Loss: {loss.item():.4f}')
-        if round(loss.item(), 4) == 0.1453:
-            x = 4
+        last_loss = loss.item()
+        print(f'Timedelta {(datetime.now() - start)}, Loss: {last_loss:.4f}, Target: {image}')
         loss.backward()
         optimizer.step()
-    # torch.save(
-    #     model.state_dict(),
-    #     os.path.join(
-    #         os.path.dirname(os.path.abspath(__file__)),
-    #         f'model_{round(loss.item(), 4)}.pth'
-    #     )
-    # )
-    #generate_video(run_id)
 
+    with Session() as s:
+        s.update(
+            f'exp1_{image}',
+            {
+                'state_dict': model.to('cpu').state_dict(),
+                'last_loss': last_loss,
+                'last_steps': last_steps,
+                'width': width,
+                'height': height
+            }
+        )
+    print(f'Done: {image}')
 
-#loop(32, 32)
 
 def make_video():
     in_channels = 16
     width = 32
     height = 32
     model = Model(in_channels, width, height)
-    model.load_state_dict(torch.load('/home/nikos/model_0.0001.pth', map_location=torch.device('cpu')))
+    model.load_state_dict(torch.load('experiment_1_0.0001.pth', map_location=torch.device('cpu')))
     state_grid = init_state_grid(in_channels, height, width)
     mse = nn.MSELoss()
     target = load_image(height, width)
@@ -181,23 +168,29 @@ def make_video():
     out = state_grid.clone()
     run_id = generate_run_id()
     os.makedirs(os.path.join(FRAMES_FOLDER, run_id), exist_ok=True)
+
+    with torch.no_grad():
+        print(f'Before: {out[:, 0:4, :, :][0].sum()}')
+        for _ in range(20000):
+            out = model(out)
+        print(f'After: {out[:, 0:4, :, :][0].sum()}')
+    print(f'After: {out[:, 0:4, :, :][0].sum()}')
     frame_id = 0
     save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
-    for _ in range(random.randint(64, 96)):
+    for _ in range(200):
         out = model(out)
         frame_id += 1
         save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
-    rgba = out[:, 0:4, :, :]
-    loss = round(mse(rgba, target).item(), 4)
-    print(loss)
+    #
+    #
+    # rgba = out[:, 0:4, :, :]
+    # loss = round(mse(rgba, target).item(), 4)
+    # print(loss)
     generate_video(run_id)
     v = 4
 
 #make_video()
+#make_video()
 
-from client import Session
-
-with Session() as s:
-    x = s.take('test')
-    b = 3
-
+# for image in ['lizard', 'butterfly', 'violin', 'shamrock', 'eggplant']:
+#     loop(64, 64, 'lizard')
