@@ -122,8 +122,10 @@ def loop(height, width, image):
         state_grid = state_grid.to('cuda')
         target = target.to('cuda')
 
-    failed = False
+    store = None
     while True:
+        failed = False
+        loss_tracing = []
         model = Model(in_channels, width, height)
         if cuda:
             model = model.to('cuda')
@@ -133,8 +135,7 @@ def loop(height, width, image):
 
         last_loss = 100
         last_steps = None
-
-        while round(last_loss, 4) > 0.001 and not failed:
+        while round(last_loss, 3) > 0.001 and not failed:
             optimizer.zero_grad()
             out = state_grid.clone()
             last_steps = random.randint(64, 96)
@@ -146,63 +147,77 @@ def loop(height, width, image):
             loss = mse(rgba, target)
             last_loss = loss.item()
             print(f'Timedelta {(datetime.now() - start)}, Loss: {last_loss:.4f}, Target: {image}')
+            loss_tracing.append(last_loss)
             loss.backward()
             optimizer.step()
 
-        if not failed:
-            with Session() as s:
-                s.update(
-                    f'exp1_{image}',
-                    {
-                        'state_dict': model.to('cpu').state_dict(),
-                        'last_loss': last_loss,
-                        'last_steps': last_steps,
-                        'width': width,
-                        'height': height
-                    }
-                )
-            print(f'Done: {image}')
-            break
-        else:
+        if failed:
+            store = {
+                'failed': True,
+                'loss_tracing': loss_tracing
+            }
             print('Failed')
+            if len(loss_tracing) < 30:
+                continue
+            else:
+                break
+        else:
+            print('Done')
+            store = {
+                'state_dict': model.to('cpu').state_dict(),
+                'last_loss': last_loss,
+                'last_steps': last_steps,
+                'width': width,
+                'height': height
+            }
+            break
+
+    with Session() as s:
+        s.update(f'exp1_{image}', store)
 
 
-def make_video():
+def last_frame(image):
+    with Session() as s:
+        item = s.take(f'exp1_#{image}')
+
+    model = Model(16, item['width'], item['height'])
+    model.load_state_dict(item['state_dict'])
+
     in_channels = 16
-    width = 32
-    height = 32
-    model = Model(in_channels, width, height)
-    model.load_state_dict(torch.load('experiment_1_0.0001.pth', map_location=torch.device('cpu')))
-    state_grid = init_state_grid(in_channels, height, width)
-    mse = nn.MSELoss()
-    target = load_image(height, width)
-    target = target.unsqueeze(0)
-    out = state_grid.clone()
-    run_id = generate_run_id()
-    os.makedirs(os.path.join(FRAMES_FOLDER, run_id), exist_ok=True)
+    width = item['width']
+    height = item['height']
 
+    state_grid = init_state_grid(in_channels, height, width)
+    out = state_grid.clone()
     with torch.no_grad():
-        print(f'Before: {out[:, 0:4, :, :][0].sum()}')
-        for _ in range(20000):
+        for _ in range(200000):
             out = model(out)
-        print(f'After: {out[:, 0:4, :, :][0].sum()}')
-    print(f'After: {out[:, 0:4, :, :][0].sum()}')
-    frame_id = 0
-    save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
-    for _ in range(200):
-        out = model(out)
-        frame_id += 1
-        save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
-    #
-    #
-    # rgba = out[:, 0:4, :, :]
-    # loss = round(mse(rgba, target).item(), 4)
-    # print(loss)
-    generate_video(run_id)
+
+    image_pil = transforms.ToPILImage()(out[:, 0:4, :, :][0])
+    image_pil.save(os.path.join('last_frames', f'{image}.png'), 'PNG')
+
+    os.system('rm -R ')
+    # frame_id = 0
+    # save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
+    # for _ in range(200):
+    #     out = model(out)
+    #     frame_id += 1
+    #     save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
+    # #
+    # #
+    # # rgba = out[:, 0:4, :, :]
+    # # loss = round(mse(rgba, target).item(), 4)
+    # # print(loss)
+    # generate_video(run_id)
     v = 4
+
+def create_video_and_last_frame(image):
+    pass
 
 #make_video()
 #make_video()
 
 # for image in ['lizard', 'butterfly', 'violin', 'shamrock', 'eggplant']:
 #     loop(64, 64, 'lizard')
+# for image in ['lizard', 'butterfly', 'violin', 'shamrock', 'eggplant']:
+#     make_video(image)
