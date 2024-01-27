@@ -116,45 +116,55 @@ def init_state_grid(in_channels, height, width):
 def loop(height, width, image):
     target = load_image(height, width, image)
     target = target.unsqueeze(0)
-
     in_channels = 16
     state_grid = init_state_grid(in_channels, height, width)
-    model = Model(in_channels, width, height)
     if cuda:
         state_grid = state_grid.to('cuda')
-        model = model.to('cuda')
         target = target.to('cuda')
-    mse = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters())
-    start = datetime.now()
 
-    last_loss = 100
-    last_steps = None
-    while round(last_loss, 4) > 0.001:
-        optimizer.zero_grad()
-        out = state_grid.clone()
-        last_steps = random.randint(64, 96)
-        for _ in range(last_steps):
-            out = model(out)
-        rgba = out[:, 0:4, :, :]
-        loss = mse(rgba, target)
-        last_loss = loss.item()
-        print(f'Timedelta {(datetime.now() - start)}, Loss: {last_loss:.4f}, Target: {image}')
-        loss.backward()
-        optimizer.step()
+    failed = False
+    while True:
+        model = Model(in_channels, width, height)
+        if cuda:
+            model = model.to('cuda')
+        mse = nn.MSELoss()
+        optimizer = optim.Adam(model.parameters())
+        start = datetime.now()
 
-    with Session() as s:
-        s.update(
-            f'exp1_{image}',
-            {
-                'state_dict': model.to('cpu').state_dict(),
-                'last_loss': last_loss,
-                'last_steps': last_steps,
-                'width': width,
-                'height': height
-            }
-        )
-    print(f'Done: {image}')
+        last_loss = 100
+        last_steps = None
+
+        while round(last_loss, 4) > 0.001 and not failed:
+            optimizer.zero_grad()
+            out = state_grid.clone()
+            last_steps = random.randint(64, 96)
+            for _ in range(last_steps):
+                out = model(out)
+                if out.sum() == 0:
+                    failed = True
+            rgba = out[:, 0:4, :, :]
+            loss = mse(rgba, target)
+            last_loss = loss.item()
+            print(f'Timedelta {(datetime.now() - start)}, Loss: {last_loss:.4f}, Target: {image}')
+            loss.backward()
+            optimizer.step()
+
+        if not failed:
+            with Session() as s:
+                s.update(
+                    f'exp1_{image}',
+                    {
+                        'state_dict': model.to('cpu').state_dict(),
+                        'last_loss': last_loss,
+                        'last_steps': last_steps,
+                        'width': width,
+                        'height': height
+                    }
+                )
+            print(f'Done: {image}')
+            break
+        else:
+            print('Failed')
 
 
 def make_video():
