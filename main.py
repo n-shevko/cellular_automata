@@ -121,6 +121,7 @@ def loop(height, width, image):
     state_grid = init_state_grid(in_channels, height, width)
     model = Model(in_channels, width, height)
     if cuda:
+        state_grid = state_grid.to('cuda')
         model = model.to('cuda')
     mse = nn.MSELoss()
     optimizer = optim.Adam(model.parameters())
