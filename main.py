@@ -123,6 +123,7 @@ def loop(height, width, image):
     if cuda:
         state_grid = state_grid.to('cuda')
         model = model.to('cuda')
+        target = target.to('cuda')
     mse = nn.MSELoss()
     optimizer = optim.Adam(model.parameters())
     start = datetime.now()
