@@ -1,5 +1,6 @@
 import random
 
+import tempfile
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -55,7 +56,7 @@ def stochastic_update(state_grid, ds_grid):
 
 
 def alive_masking(state_grid):
-    alive = (F.max_pool2d(state_grid[3].unsqueeze(0), kernel_size=3, stride=1, padding=1) > 0.1).float()
+    alive = (F.max_pool2d(state_grid, kernel_size=3, stride=1, padding=1) > 0.1).float()
     state_grid = state_grid * alive
     return state_grid
 
@@ -82,17 +83,17 @@ class Model(nn.Module):
     def forward(self, state_grid):
         # Feature Extraction Layer
         perception_grid = self.conv(state_grid)
-        perception_grid = perception_grid[0].permute(1, 2, 0).view(-1, 48)
+        perception_grid = perception_grid.permute(0, 2, 3, 1)
 
         # Fully Connected Layers
         x = self.dense1(perception_grid)
         x = F.relu(x)
         ds_grid = self.dense2(x)
-        ds_grid = ds_grid.view(self.width, self.height, 16).permute(2, 0, 1)
+        ds_grid = ds_grid.permute(0, 3, 1, 2)
 
-        state_grid = stochastic_update(state_grid[0], ds_grid)
+        state_grid = stochastic_update(state_grid, ds_grid)
         state_grid = alive_masking(state_grid)
-        return state_grid.unsqueeze(0)
+        return state_grid
 
 
 def load_image(height, width, image_name):
@@ -176,9 +177,14 @@ def loop(height, width, image):
         s.update(f'exp1_{image}', store)
 
 
-def last_frame(image):
+def save_frame(folder, out, name):
+    image_pil = transforms.ToPILImage()(out[:, 0:4, :, :][0])
+    image_pil.save(os.path.join(folder, f'{name}.png'), 'PNG')
+
+
+def create_video_and_last_frame(image):
     with Session() as s:
-        item = s.take(f'exp1_#{image}')
+        item = s.take(f'exp1_{image}')
 
     model = Model(16, item['width'], item['height'])
     model.load_state_dict(item['state_dict'])
@@ -188,36 +194,53 @@ def last_frame(image):
     height = item['height']
 
     state_grid = init_state_grid(in_channels, height, width)
-    out = state_grid.clone()
+    # out = state_grid.clone()
+    # with torch.no_grad():
+    #     for _ in range(2000):
+    #         out = model(out)
+    #     save_frame('last_frames', out, image)
+
+    target = load_image(height, width, image)
+    target = target.unsqueeze(0)
+
+    temp_dir = tempfile.mkdtemp()
+    save_frame(temp_dir, target, 'target')
     with torch.no_grad():
-        for _ in range(200000):
+        out = state_grid.clone()
+        save_frame(temp_dir, out, 0)
+        frame = 1
+        from tqdm import tqdm
+        mse = nn.MSELoss()
+
+
+
+        for step in tqdm(range(item['last_steps'] + 20000)):
+            if step + 1 < item['last_steps']:
+                rgba = out[:, 0:4, :, :]
+                loss = mse(rgba, target).item()
+                print(f'Loss {loss}')
             out = model(out)
+            save_frame(temp_dir, out, frame)
+            frame += 1
+        video = generate_video(temp_dir, image)
+        os.system(f'mv {video} last_frames')
 
-    image_pil = transforms.ToPILImage()(out[:, 0:4, :, :][0])
-    image_pil.save(os.path.join('last_frames', f'{image}.png'), 'PNG')
+        rgba = out[:, 0:4, :, :]
+        loss = mse(rgba, target).item()
+        print(f'Loss {loss}')
+        c = 3
+    os.system(f'rm -R {temp_dir}')
 
-    os.system('rm -R ')
-    # frame_id = 0
-    # save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
-    # for _ in range(200):
-    #     out = model(out)
-    #     frame_id += 1
-    #     save_frame(run_id, frame_id, out[:, 0:4, :, :][0])
-    # #
-    # #
-    # # rgba = out[:, 0:4, :, :]
-    # # loss = round(mse(rgba, target).item(), 4)
-    # # print(loss)
-    # generate_video(run_id)
-    v = 4
 
-def create_video_and_last_frame(image):
-    pass
 
 #make_video()
 #make_video()
 
 # for image in ['lizard', 'butterfly', 'violin', 'shamrock', 'eggplant']:
 #     loop(64, 64, 'lizard')
-# for image in ['lizard', 'butterfly', 'violin', 'shamrock', 'eggplant']:
-#     make_video(image)
+# for image in ['violin', 'shamrock', 'eggplant']:
+#     create_video_and_last_frame(image)
+
+
+
+loop(64, 64, 'lizard')

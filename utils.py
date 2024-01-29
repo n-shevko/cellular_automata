@@ -25,7 +25,10 @@ def save_frame(run_id, frame_id, image):
     image_pil.save(os.path.join(FRAMES_FOLDER, run_id, f'{frame_id}.png'), 'PNG')
 
 
-def generate_video(run_id):
-    os.chdir(os.path.join(FRAMES_FOLDER, run_id))
-    out = os.path.join(FRAMES_FOLDER, run_id + '.mp4')
+def generate_video(folder, file):
+    old = os.getcwd()
+    os.chdir(folder)
+    out = os.path.join(folder, file + '.mp4')
     os.system(f'ffmpeg -framerate 30 -i %d.png -c:v libx264 -pix_fmt yuv420p {out}')
+    os.chdir(old)
+    return out

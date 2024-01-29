@@ -152,7 +152,8 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
-.frames/
+frames/
+last_frames/
 config.json
 
 
