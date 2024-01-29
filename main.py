@@ -56,13 +56,21 @@ def stochastic_update(state_grid, ds_grid):
 
 
 def alive_masking(state_grid):
-    alive = (F.max_pool2d(state_grid, kernel_size=3, stride=1, padding=1) > 0.1).float()
+    only_alpha = state_grid[:, 3, :, :]
+    alive = (F.max_pool2d(only_alpha, kernel_size=3, stride=1, padding=1) > 0.1).float()
+    alive = alive.unsqueeze(1).expand(-1, state_grid.shape[1], -1, -1)
+    state_grid = state_grid * alive
+    return state_grid
+
+
+def alive_masking_old(state_grid):
+    alive = (F.max_pool2d(state_grid[3].unsqueeze(0), kernel_size=3, stride=1, padding=1) > 0.1).float()
     state_grid = state_grid * alive
     return state_grid
 
 
 class Model(nn.Module):
-    def __init__(self, in_channels, width, height):
+    def __init__(self, in_channels, width, height, old):
         super(Model, self).__init__()
         self.conv = nn.Conv2d(
             in_channels=in_channels,
@@ -79,8 +87,27 @@ class Model(nn.Module):
         self.dense1 = nn.Linear(in_features=48, out_features=128)
         self.dense2 = nn.Linear(in_features=128, out_features=16)
         nn.init.zeros_(self.dense2.weight)
+        self.old = old
+
+    def forward_old(self, state_grid):
+        # Feature Extraction Layer
+        perception_grid = self.conv(state_grid)
+        perception_grid = perception_grid[0].permute(1, 2, 0).view(-1, 48)
+
+        # Fully Connected Layers
+        x = self.dense1(perception_grid)
+        x = F.relu(x)
+        ds_grid = self.dense2(x)
+        ds_grid = ds_grid.view(self.width, self.height, 16).permute(2, 0, 1)
+
+        state_grid = stochastic_update(state_grid[0], ds_grid)
+        state_grid = alive_masking_old(state_grid)
+        return state_grid.unsqueeze(0)
 
     def forward(self, state_grid):
+        if self.old:
+            return self.forward_old(state_grid)
+
         # Feature Extraction Layer
         perception_grid = self.conv(state_grid)
         perception_grid = perception_grid.permute(0, 2, 3, 1)
@@ -114,7 +141,7 @@ def init_state_grid(in_channels, height, width):
     return torch.cat((rgb_channels, non_rgb_channels), dim=0).unsqueeze(0)
 
 
-def loop(height, width, image):
+def loop(height, width, image, old):
     target = load_image(height, width, image)
     target = target.unsqueeze(0)
     in_channels = 16
@@ -127,7 +154,7 @@ def loop(height, width, image):
     while True:
         failed = False
         loss_tracing = []
-        model = Model(in_channels, width, height)
+        model = Model(in_channels, width, height, old)
         if cuda:
             model = model.to('cuda')
         mse = nn.MSELoss()
@@ -243,4 +270,4 @@ def create_video_and_last_frame(image):
 
 
 
-#loop(64, 64, 'lizard')
+loop(64, 64, 'lizard', True)
