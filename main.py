@@ -270,4 +270,4 @@ def create_video_and_last_frame(image):
 
 
 
-loop(64, 64, 'lizard', True)
+#loop(64, 64, 'lizard', False)
