@@ -174,7 +174,7 @@ def loop(height, width, image):
             break
 
     with Session() as s:
-        s.update(f'exp1_{image}', store)
+        s.update(f'exp1_1_{image}', store)
 
 
 def save_frame(folder, out, name):
@@ -243,4 +243,4 @@ def create_video_and_last_frame(image):
 
 
 
-loop(64, 64, 'lizard')
+#loop(64, 64, 'lizard')
