@@ -272,7 +272,7 @@ def experiment_2(height, width, image):
     target = target.expand(batch_size, -1, -1, -1)
 
     in_channels = 16
-    pool = init_state_grid(in_channels, height, width).expand(pool_size, -1, -1, -1) # torch.rand(pool_size, in_channels, height, width)
+    pool = init_state_grid(in_channels, height, width).expand(pool_size, -1, -1, -1) # torch.rand(pool_size, in_channels, height, width)#
     seed = pool[0].clone()
 
     model = Model(in_channels, width, height)
@@ -287,7 +287,9 @@ def experiment_2(height, width, image):
     optimizer = optim.Adam(model.parameters())
 
     start = datetime.now()
-    while (datetime.now() - start) < timedelta(minutes=20):
+    last_checkpoint = start
+    loss_val = 100
+    while round(loss_val, 3) > 0.001:
         idxs = torch.randperm(len(pool))[:batch_size]
         batch = pool[idxs].clone().detach()  # TODO .clone().detach()
         rgba = batch[:, 0:4, :, :]
@@ -302,17 +304,22 @@ def experiment_2(height, width, image):
 
         rgba = batch[:, 0:4, :, :]
         loss = mse_with_reduction(rgba, target)
-        print(f'Timedelta {(datetime.now() - start)}, Loss: {loss.item():.4f}, Target: {image}')
+        loss_val = loss.item()
+        print(f'Timedelta {(datetime.now() - start)}, Loss: {loss_val:.4f}, Target: {image}')
         loss.backward()
         optimizer.step()
 
         pool[idxs] = batch
+        if (datetime.now() - last_checkpoint) > timedelta(minutes=10) or not (round(loss_val, 3) > 0.001):
+            with Session() as s:
+                s.update(f'exp2_{image}', {
+                    'model': model.to('cpu').state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'loss': loss.item(),
+                    'delta': datetime.now() - start,
+                    'pool': pool
+                })
+            last_checkpoint = datetime.now()
 
-    with Session() as s:
-        s.update(f'exp2_{image}',
-                 {
-                     'state_dict': model.to('cpu').state_dict(),
-                     'loss': loss.item()
-                 })
 
 #experiment_2(64, 64, 'lizard')
