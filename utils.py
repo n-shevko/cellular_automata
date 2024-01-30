@@ -1,4 +1,6 @@
 import os
+import torch
+import gc
 
 from torchvision import transforms
 
@@ -32,3 +34,18 @@ def generate_video(folder, file):
     os.system(f'ffmpeg -framerate 30 -i %d.png -c:v libx264 -pix_fmt yuv420p {out}')
     os.chdir(old)
     return out
+
+
+def count_objects():
+    for obj in gc.get_objects():
+        try:
+            if torch.is_tensor(obj):
+                if len(obj.shape) == 1 and obj.shape[0] in [1024, 32]:
+                    c = 3
+                print(type(obj), obj.size())
+            elif hasattr(obj, 'data') and torch.is_tensor(obj.data):
+                if len(obj.data.shape) == 1 and obj.data.size()[0] in [1024, 32]:
+                    c = 3
+                print(type(obj.data), obj.data.size())
+        except:
+            pass

@@ -272,7 +272,7 @@ def experiment_2(height, width, image):
     target = target.expand(batch_size, -1, -1, -1)
 
     in_channels = 16
-    pool = init_state_grid(in_channels, height, width).expand(pool_size, -1, -1, -1) # torch.rand(pool_size, in_channels, height, width)#
+    pool = init_state_grid(in_channels, height, width).expand(pool_size, -1, -1, -1)
     seed = pool[0].clone()
 
     model = Model(in_channels, width, height)
@@ -283,34 +283,33 @@ def experiment_2(height, width, image):
         model = model.to('cuda')
 
     mse = nn.MSELoss(reduction='none')
-    mse_with_reduction = nn.MSELoss()
     optimizer = optim.Adam(model.parameters())
 
     start = datetime.now()
     last_checkpoint = start
-    loss_val = 100
-    while round(loss_val, 3) > 0.001:
-        idxs = torch.randperm(len(pool))[:batch_size]
-        batch = pool[idxs].clone().detach()  # TODO .clone().detach()
-        rgba = batch[:, 0:4, :, :]
-        loss = mse(rgba, target).mean(dim=(1, 2, 3))
-        max_loss_idx = torch.argmax(loss)
-        batch[max_loss_idx] = seed.clone().detach()  # TODO .clone().detach()
 
+    stop = False
+    while not stop:
+        idxs = torch.randperm(len(pool))[:batch_size]
+        batch = pool[idxs].detach()
         optimizer.zero_grad()
         steps = random.randint(64, 96)
         for _ in range(steps):
             batch = model(batch)
 
         rgba = batch[:, 0:4, :, :]
-        loss = mse_with_reduction(rgba, target)
+        loss = mse(rgba, target).mean(dim=(1, 2, 3))
+        max_loss_idx = torch.argmax(loss)
+        loss = loss.mean()
         loss_val = loss.item()
         print(f'Timedelta {(datetime.now() - start)}, Loss: {loss_val:.4f}, Target: {image}')
         loss.backward()
         optimizer.step()
+        batch[max_loss_idx] = seed
+        pool[idxs] = batch.detach()
 
-        pool[idxs] = batch
-        if (datetime.now() - last_checkpoint) > timedelta(minutes=10) or not (round(loss_val, 3) > 0.001):
+        stop = round(loss_val, 3) <= 0.001
+        if (datetime.now() - last_checkpoint) > timedelta(minutes=10) or stop:
             with Session() as s:
                 s.update(f'exp2_{image}', {
                     'model': copy.deepcopy(model).to('cpu').state_dict(),
@@ -322,4 +321,4 @@ def experiment_2(height, width, image):
             last_checkpoint = datetime.now()
 
 
-#experiment_2(64, 64, 'lizard')
+#experiment_2(32, 32, 'lizard')
