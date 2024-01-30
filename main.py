@@ -1,5 +1,5 @@
 import random
-
+import copy
 import tempfile
 import torch
 import torch.nn as nn
@@ -313,7 +313,7 @@ def experiment_2(height, width, image):
         if (datetime.now() - last_checkpoint) > timedelta(minutes=1) or not (round(loss_val, 3) > 0.001):
             with Session() as s:
                 s.update(f'exp2_{image}', {
-                    'model': model.to('cpu').state_dict(),
+                    'model': copy.deepcopy(model).to('cpu').state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'loss': loss.item(),
                     'delta': datetime.now() - start,
