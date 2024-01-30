@@ -267,45 +267,52 @@ def create_video_and_last_frame(image):
 
 def experiment_2(height, width, image):
     pool_size = 1024
+    batch_size = 32
     target = load_image(height, width, image)
-    target = target.unsqueeze(0).expand(pool_size, -1, -1, -1)
+    target = target.expand(batch_size, -1, -1, -1)
 
     in_channels = 16
-    state_grid = init_state_grid(in_channels, height, width)
-    state_grid = state_grid.unsqueeze(0).expand(pool_size, -1, -1, -1)
+    pool = init_state_grid(in_channels, height, width).expand(pool_size, -1, -1, -1) # torch.rand(pool_size, in_channels, height, width)
+    seed = pool[0].clone()
+
+    model = Model(in_channels, width, height)
 
     if cuda:
-        state_grid = state_grid.to('cuda')
+        pool = pool.to('cuda')
         target = target.to('cuda')
+        model = model.to('cuda')
 
-    store = None
-    while True:
-        failed = False
-        loss_tracing = []
-        model = Model(in_channels, width, height)
-        if cuda:
-            model = model.to('cuda')
-        mse = nn.MSELoss()
-        optimizer = optim.Adam(model.parameters())
-        start = datetime.now()
+    mse = nn.MSELoss(reduction='none')
+    mse_with_reduction = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters())
 
-        last_loss = 100
-        last_steps = None
-        while round(last_loss, 3) > 0.001 and not failed:
-            optimizer.zero_grad()
-            out = state_grid.clone()
-            last_steps = random.randint(64, 96)
-            for _ in range(last_steps):
-                out = model(out)
-                if out.sum() == 0:
-                    failed = True
-            rgba = out[:, 0:4, :, :]
-            loss = mse(rgba, target)
-            last_loss = loss.item()
-            print(f'Timedelta {(datetime.now() - start)}, Loss: {last_loss:.4f}, Target: {image}')
-            loss_tracing.append(last_loss)
-            loss.backward()
-            optimizer.step()
+    start = datetime.now()
+    while (datetime.now() - start) < timedelta(minutes=20):
+        idxs = torch.randperm(len(pool))[:batch_size]
+        batch = pool[idxs].clone().detach()  # TODO .clone().detach()
+        rgba = batch[:, 0:4, :, :]
+        loss = mse(rgba, target).mean(dim=(1, 2, 3))
+        max_loss_idx = torch.argmax(loss)
+        batch[max_loss_idx] = seed.clone().detach()  # TODO .clone().detach()
 
+        optimizer.zero_grad()
+        steps = random.randint(64, 96)
+        for _ in range(steps):
+            batch = model(batch)
 
-experiment_2(64, 64, 'lizard')
+        rgba = batch[:, 0:4, :, :]
+        loss = mse_with_reduction(rgba, target)
+        print(f'Timedelta {(datetime.now() - start)}, Loss: {loss.item():.4f}, Target: {image}')
+        loss.backward()
+        optimizer.step()
+
+        pool[idxs] = batch
+
+    with Session() as s:
+        s.update(f'exp2_{image}',
+                 {
+                     'state_dict': model.to('cpu').state_dict(),
+                     'loss': loss.item()
+                 })
+
+#experiment_2(64, 64, 'lizard')
