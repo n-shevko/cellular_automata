@@ -310,7 +310,7 @@ def experiment_2(height, width, image):
         optimizer.step()
 
         pool[idxs] = batch
-        if (datetime.now() - last_checkpoint) > timedelta(minutes=10) or not (round(loss_val, 3) > 0.001):
+        if (datetime.now() - last_checkpoint) > timedelta(minutes=1) or not (round(loss_val, 3) > 0.001):
             with Session() as s:
                 s.update(f'exp2_{image}', {
                     'model': model.to('cpu').state_dict(),
