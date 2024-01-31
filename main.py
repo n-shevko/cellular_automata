@@ -289,9 +289,9 @@ def experiment_2(height, width, image):
             with Session() as s:
                 s.update(f'exp2_{image}', {
                     'model': copy.deepcopy(model).to('cpu').state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'loss': loss.item(),
-                    'delta': datetime.now() - start,
+                    # 'optimizer': optimizer.state_dict(),
+                    # 'loss': loss.item(),
+                    # 'delta': datetime.now() - start,
                 })
             break
             last_checkpoint = datetime.now()
