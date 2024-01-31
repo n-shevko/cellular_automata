@@ -188,12 +188,11 @@ def create_video_and_last_frame(image):
     with Session() as s:
         item = s.take(f'exp2_{image}')
 
-    width = 32
-    height = 32
-    model = Model(16, width, height)
-    model.load_state_dict(item['state_dict'])
-
+    width = 64
+    height = 64
     in_channels = 16
+    model = Model(in_channels, width, height)
+    model.load_state_dict(item['state_dict'])
 
 
     state_grid = init_state_grid(in_channels, height, width)
@@ -217,7 +216,7 @@ def create_video_and_last_frame(image):
             out = model(out)
             save_frame(temp_dir, out, frame)
             frame += 1
-        video = generate_video(temp_dir, image)
+        video = generate_video(temp_dir, image + '_persist')
         os.system(f'mv {video} last_frames')
 
         rgba = out[:, 0:4, :, :]
