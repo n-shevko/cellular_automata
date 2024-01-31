@@ -272,7 +272,7 @@ def experiment_2(height, width, image):
     target = target.expand(batch_size, -1, -1, -1)
 
     in_channels = 16
-    pool = init_state_grid(in_channels, height, width).expand(pool_size, -1, -1, -1)
+    pool = init_state_grid(in_channels, height, width).repeat(pool_size, 1, 1, 1)
     seed = pool[0].clone()
 
     model = Model(in_channels, width, height)
@@ -291,7 +291,8 @@ def experiment_2(height, width, image):
     stop = False
     while not stop:
         idxs = torch.randperm(len(pool))[:batch_size]
-        batch = pool[idxs].detach()
+        batch = pool[idxs]
+
         optimizer.zero_grad()
         steps = random.randint(64, 96)
         for _ in range(steps):
