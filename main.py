@@ -292,7 +292,6 @@ def experiment_2(height, width, image):
                     'optimizer': optimizer.state_dict(),
                     'loss': loss.item(),
                     'delta': datetime.now() - start,
-                    'pool': pool
                 })
             break
             last_checkpoint = datetime.now()
@@ -303,5 +302,5 @@ def experiment_2(height, width, image):
 #create_video_and_last_frame('lizard')
 
 # with Session() as s:
-#     model = s.take('test')
-    v = 3
+#     model = s.take('exp2_lizard')
+#     v = 3
