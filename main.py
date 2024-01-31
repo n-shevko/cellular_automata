@@ -186,22 +186,17 @@ def save_frame(folder, out, name):
 
 def create_video_and_last_frame(image):
     with Session() as s:
-        item = s.take(f'exp1_{image}')
+        item = s.take(f'exp2_{image}')
 
-    model = Model(16, item['width'], item['height'])
+    width = 32
+    height = 32
+    model = Model(16, width, height)
     model.load_state_dict(item['state_dict'])
 
     in_channels = 16
-    width = item['width']
-    height = item['height']
+
 
     state_grid = init_state_grid(in_channels, height, width)
-    # out = state_grid.clone()
-    # with torch.no_grad():
-    #     for _ in range(2000):
-    #         out = model(out)
-    #     save_frame('last_frames', out, image)
-
     target = load_image(height, width, image)
     target = target.unsqueeze(0)
 
@@ -213,8 +208,6 @@ def create_video_and_last_frame(image):
         frame = 1
         from tqdm import tqdm
         mse = nn.MSELoss()
-
-
 
         for step in tqdm(range(item['last_steps'] + 20000)):
             if step + 1 < item['last_steps']:
@@ -230,7 +223,6 @@ def create_video_and_last_frame(image):
         rgba = out[:, 0:4, :, :]
         loss = mse(rgba, target).item()
         print(f'Loss {loss}')
-        c = 3
     os.system(f'rm -R {temp_dir}')
 
 
@@ -246,23 +238,6 @@ def create_video_and_last_frame(image):
 
 
 #loop(64, 64, 'lizard', False)
-
-
-# # Set alpha and hidden channels to (1.0).
-# seed = zeros(64, 64, 16)
-# seed[64 // 2, 64 // 2, 3:] = 1.0
-# target = targets[‘lizard’]
-# pool = [seed] * 1024
-# for i in range(training_iterations):
-#     idxs, batch = pool.sample(32)
-#     # Sort by loss, descending.
-#     batch = sort_desc(batch, loss(batch))
-#     # Replace the highest-loss sample with the seed.
-#     batch[0] = seed
-#     # Perform training.
-#     outputs, loss = train(batch, target)
-#     # Place outputs back in the pool.
-#     pool[idxs] = outputs
 
 
 def experiment_2(height, width, image):
@@ -310,7 +285,7 @@ def experiment_2(height, width, image):
         pool[idxs] = batch.detach()
 
         stop = round(loss_val, 3) <= 0.001
-        if (datetime.now() - last_checkpoint) > timedelta(minutes=10) or stop:
+        if True:#(datetime.now() - last_checkpoint) > timedelta(minutes=10) or stop:
             with Session() as s:
                 s.update(f'exp2_{image}', {
                     'model': copy.deepcopy(model).to('cpu').state_dict(),
@@ -319,7 +294,14 @@ def experiment_2(height, width, image):
                     'delta': datetime.now() - start,
                     'pool': pool
                 })
+            break
             last_checkpoint = datetime.now()
 
 
+
 #experiment_2(32, 32, 'lizard')
+#create_video_and_last_frame('lizard')
+
+# with Session() as s:
+#     model = s.take('test')
+    v = 3
