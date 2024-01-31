@@ -3,8 +3,8 @@ import gc
 import tempfile
 
 import torch
-import torch.nn as nn
 
+from tqdm import tqdm
 from torchvision import transforms
 from PIL import Image
 
@@ -84,36 +84,20 @@ def create_video(image):
     height = 64
     in_channels = 16
     model = Model(in_channels, width, height)
-    model.load_state_dict(item['state_dict'])
-
+    model.load_state_dict(item['model'])
 
     state_grid = init_state_grid(in_channels, height, width)
-    target = load_image(height, width, image)
-    target = target.unsqueeze(0)
-
     temp_dir = tempfile.mkdtemp()
-    save_frame(temp_dir, target, 'target')
     with torch.no_grad():
         out = state_grid.clone()
         save_frame(temp_dir, out, 0)
         frame = 1
-        from tqdm import tqdm
-        mse = nn.MSELoss()
-
-        for step in tqdm(range(item['last_steps'] + 20000)):
-            if step + 1 < item['last_steps']:
-                rgba = out[:, 0:4, :, :]
-                loss = mse(rgba, target).item()
-                print(f'Loss {loss}')
+        for _ in tqdm(range(40000)):
             out = model(out)
             save_frame(temp_dir, out, frame)
             frame += 1
         video = generate_video(temp_dir, image + '_persist')
         os.system(f'mv {video} last_frames')
-
-        rgba = out[:, 0:4, :, :]
-        loss = mse(rgba, target).item()
-        print(f'Loss {loss}')
     os.system(f'rm -R {temp_dir}')
 
 
