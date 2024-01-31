@@ -289,7 +289,7 @@ def experiment_2(height, width, image):
             with Session() as s:
                 s.update(f'exp2_{image}', {
                     'model': copy.deepcopy(model).to('cpu').state_dict(),
-                    # 'optimizer': optimizer.state_dict(),
+                    'optimizer': optimizer.state_dict(),
                     # 'loss': loss.item(),
                     # 'delta': datetime.now() - start,
                 })
@@ -301,6 +301,6 @@ def experiment_2(height, width, image):
 #experiment_2(32, 32, 'lizard')
 #create_video_and_last_frame('lizard')
 
-# with Session() as s:
-#     model = s.take('exp2_lizard')
-#     v = 3
+with Session() as s:
+    model = s.take('exp2_lizard')
+    v = 3
