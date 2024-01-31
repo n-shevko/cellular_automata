@@ -1,8 +1,15 @@
 import os
-import torch
 import gc
+import tempfile
+
+import torch
+import torch.nn as nn
 
 from torchvision import transforms
+from PIL import Image
+
+from client import Session
+from model import Model
 
 
 FRAMES_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frames')
@@ -15,11 +22,6 @@ def generate_run_id():
         return str(max(folders) + 1)
     else:
         return '1'
-
-
-# def save_frame(name, image):
-#     image_pil = transforms.ToPILImage()(image)
-#     image_pil.save(f'/home/nikos/{name}.png', 'PNG')
 
 
 def save_frame(run_id, frame_id, image):
@@ -49,3 +51,79 @@ def count_objects():
                 print(type(obj.data), obj.data.size())
         except:
             pass
+
+
+def load_image(height, width, image_name):
+    image = Image.open(f"images/{image_name}.png").convert('RGBA')
+    resized_image = image.resize((width, height))
+    transform = transforms.ToTensor()
+    return transform(resized_image)
+
+
+def init_state_grid(in_channels, height, width):
+    rgb_channels = torch.zeros(3, height, width)
+    non_rgb_channel = torch.zeros(height, width)
+    seed_y = int(height / 2)
+    seed_x = int(width / 2)
+    non_rgb_channel[seed_y][seed_x] = 1
+    non_rgb_channel = non_rgb_channel.unsqueeze(0)
+    non_rgb_channels = non_rgb_channel.repeat(in_channels - 3, 1, 1)
+    return torch.cat((rgb_channels, non_rgb_channels), dim=0).unsqueeze(0)
+
+
+def save_frame(folder, out, name):
+    image_pil = transforms.ToPILImage()(out[:, 0:4, :, :][0])
+    image_pil.save(os.path.join(folder, f'{name}.png'), 'PNG')
+
+
+def create_video(image):
+    with Session() as s:
+        item = s.take(f'exp2_{image}')
+
+    width = 64
+    height = 64
+    in_channels = 16
+    model = Model(in_channels, width, height)
+    model.load_state_dict(item['state_dict'])
+
+
+    state_grid = init_state_grid(in_channels, height, width)
+    target = load_image(height, width, image)
+    target = target.unsqueeze(0)
+
+    temp_dir = tempfile.mkdtemp()
+    save_frame(temp_dir, target, 'target')
+    with torch.no_grad():
+        out = state_grid.clone()
+        save_frame(temp_dir, out, 0)
+        frame = 1
+        from tqdm import tqdm
+        mse = nn.MSELoss()
+
+        for step in tqdm(range(item['last_steps'] + 20000)):
+            if step + 1 < item['last_steps']:
+                rgba = out[:, 0:4, :, :]
+                loss = mse(rgba, target).item()
+                print(f'Loss {loss}')
+            out = model(out)
+            save_frame(temp_dir, out, frame)
+            frame += 1
+        video = generate_video(temp_dir, image + '_persist')
+        os.system(f'mv {video} last_frames')
+
+        rgba = out[:, 0:4, :, :]
+        loss = mse(rgba, target).item()
+        print(f'Loss {loss}')
+    os.system(f'rm -R {temp_dir}')
+
+
+def get_cuda():
+    cuda = torch.cuda.is_available()
+    if cuda:
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
+        torch.cuda.set_device(0)
+        torch.device("cuda:0")
+        print('GPU')
+    else:
+        torch.set_num_threads((torch.get_num_threads() * 2) - 1)
+        print('CPU')
