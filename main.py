@@ -261,8 +261,6 @@ def experiment_2(height, width, image):
     optimizer = optim.Adam(model.parameters())
 
     start = datetime.now()
-    last_checkpoint = start
-
     stop = False
     while not stop:
         idxs = torch.randperm(len(pool))[:batch_size]
@@ -285,21 +283,14 @@ def experiment_2(height, width, image):
         pool[idxs] = batch.detach()
 
         stop = round(loss_val, 3) <= 0.001
-        if True:#(datetime.now() - last_checkpoint) > timedelta(minutes=10) or stop:
+        if stop:
             with Session() as s:
                 s.update(f'exp2_{image}', {
                     'model': copy.deepcopy(model).to('cpu').state_dict(),
                     'loss': loss.item(),
                     'delta': datetime.now() - start,
                 })
-            break
-            last_checkpoint = datetime.now()
-
 
 
 #experiment_2(32, 32, 'lizard')
 #create_video_and_last_frame('lizard')
-
-# with Session() as s:
-#     model = s.take('exp2_lizard')
-#     v = 3
