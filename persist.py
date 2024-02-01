@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from client import Session
 from datetime import datetime
-from utils import get_cuda, load_image, init_state_grid, create_video, save_frame, generate_video
+from utils import get_cuda, load_image, init_state_grid, save_frame, generate_video, damage, get_mask
 from model import Model
 
 
@@ -70,11 +70,8 @@ def experiment_2(height, width, image):
 
 #create_video('lizard')
 
-def damage(out, radius):
-    height, width = out.shape
 
-
-def damage_for_immortal(image):
+def damage_immortal(image):
     with Session() as s:
         item = s.take(f'exp2_{image}')
 
@@ -86,6 +83,7 @@ def damage_for_immortal(image):
 
     state_grid = init_state_grid(in_channels, height, width)
     temp_dir = tempfile.mkdtemp()
+    mask = get_mask(height, width)
     with torch.no_grad():
         out = state_grid.clone()
         save_frame(temp_dir, out, 0)
@@ -95,40 +93,16 @@ def damage_for_immortal(image):
             save_frame(temp_dir, out, frame)
             frame += 1
 
+        x_center = 53 #random.randint(0, 64)
+        y_center = 27 #random.randint(0, 64)
+        print(f'Center: {x_center} {y_center}')
+        out = damage(mask, out, 15, x_center, y_center)
         for _ in tqdm(range(10000)):
-            pass
-        video = generate_video(temp_dir, image + '_persist')
+            out = model(out)
+            save_frame(temp_dir, out, frame)
+            frame += 1
+        video = generate_video(temp_dir, image + '_persist_damage')
         os.system(f'mv {video} last_frames')
     os.system(f'rm -R {temp_dir}')
 
-
-import torch
-
-torch.set_printoptions(threshold=5000, linewidth=200)
-
-# Установка размеров
-height, width = 200, 200
-grid = torch.zeros((height, width))
-
-radius = 100
-x_center, y_center = 100, 100
-
-# Создание сетки координат
-y = torch.arange(0, height)
-x = torch.arange(0, width)
-xx, yy = torch.meshgrid(x, y, indexing='ij')
-
-# Инверсия координат Y для соответствия координатам плоскости
-yy = height - yy - 1
-
-# Вычисление расстояний до центра
-distances = (xx - x_center) ** 2 + (yy - y_center) ** 2
-
-# Маска для круга
-circle_mask = distances <= radius ** 2
-
-# Получение индексов для круга
-circle_indices = circle_mask.nonzero()
-
-# Установка значений в grid
-grid[circle_indices[:, 0], circle_indices[:, 1]] = 1
+#damage_immortal('lizard')

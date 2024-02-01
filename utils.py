@@ -111,3 +111,21 @@ def get_cuda():
     else:
         torch.set_num_threads((torch.get_num_threads() * 2) - 1)
         print('CPU')
+
+
+def get_mask(height, width):
+    y = torch.arange(0, height)
+    x = torch.arange(0, width)
+    xx, yy = torch.meshgrid(x, y, indexing='ij')
+    yy = height - yy - 1
+    return xx, yy
+
+
+def damage(mask, grid, radius, x_center, y_center):
+    xx, yy = mask
+    distances = (xx - x_center) ** 2 + (yy - y_center) ** 2
+    circle_mask = distances <= radius ** 2
+
+    circle_indices = circle_mask.nonzero()
+    grid[:, circle_indices[:, 0], circle_indices[:, 1]] = 0
+    return grid
