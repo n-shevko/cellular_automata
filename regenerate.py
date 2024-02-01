@@ -12,6 +12,7 @@ from model import Model
 
 
 def experiment_3(height, width, image):
+    cuda = get_cuda()
     pool_size = 1024
     batch_size = 8
     target = load_image(height, width, image)
@@ -23,7 +24,7 @@ def experiment_3(height, width, image):
 
     model = Model(in_channels, width, height)
 
-    if get_cuda():
+    if cuda:
         pool = pool.to('cuda')
         target = target.to('cuda')
         model = model.to('cuda')
