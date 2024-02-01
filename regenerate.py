@@ -11,8 +11,18 @@ from utils import get_cuda, load_image, init_state_grid, damage, get_mask
 from model import Model
 
 
+cuda = torch.cuda.is_available()
+if cuda:
+    torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    torch.cuda.set_device(0)
+    torch.device("cuda:0")
+    print('GPU')
+else:
+    torch.set_num_threads((torch.get_num_threads() * 2) - 1)
+    print('CPU')
+
+
 def experiment_3(height, width, image):
-    cuda = get_cuda()
     pool_size = 1024
     batch_size = 8
     target = load_image(height, width, image)
