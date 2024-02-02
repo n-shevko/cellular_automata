@@ -127,5 +127,5 @@ def damage(mask, grid, radius, x_center, y_center):
     circle_mask = distances <= radius ** 2
 
     circle_indices = circle_mask.nonzero()
-    grid[:, circle_indices[:, 0], circle_indices[:, 1]] = 0
+    grid[:, :, circle_indices[:, 0], circle_indices[:, 1]] = 0
     return grid
