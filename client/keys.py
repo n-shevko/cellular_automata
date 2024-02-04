@@ -5,7 +5,7 @@ from client.utils import to_db_key
 
 
 class Session(BaseSession):
-    def take(self, key_or_keys, default_value=None, bulk=False):
+    def get(self, key_or_keys, default_value=None, bulk=False):
         if not bulk:
             key_or_keys = [key_or_keys]
 
@@ -24,7 +24,7 @@ class Session(BaseSession):
             keys_ids.append(row['k'])
             values_ids.append(row['v'])
 
-        data = self.get(keys_ids + values_ids)
+        data = self.get_id(keys_ids + values_ids)
         result = []
         for key_id, value_id in zip(keys_ids, values_ids):
             try:
@@ -63,7 +63,7 @@ class Session(BaseSession):
             keys.append(row['k'])
             values.append(row['v'])
 
-        keys_as_objects = self.get(keys)
+        keys_as_objects = self.get_id(keys)
         values_to_drop = []
         keys_to_drop = []
         for key_id, value_id in zip(keys, values):
@@ -84,7 +84,7 @@ class Session(BaseSession):
 
         return tmp2, tmp3
 
-    def update(self, key_or_keys, value_or_values, bulk=False):
+    def set(self, key_or_keys, value_or_values, bulk=False):
         md5_from_keys, keys_as_json = self.remove(key_or_keys, bulk=bulk)
         keys_as_json = list(keys_as_json)
 
@@ -112,7 +112,7 @@ class Session(BaseSession):
 
         keys_ids = [row['k'] for row in
                     self.q("select k from kv_storage force index (key_md5_idx) where key_md5 in (%s)" % ','.join(tmp2))]
-        keys = self.get(keys_ids)
+        keys = self.get_id(keys_ids)
         result = [False] * len(key_or_keys)
         for key in keys.values():
             idx = tmp3.get(key)

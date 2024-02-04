@@ -48,7 +48,7 @@ class Session(Db, Ftp):
             else:
                 return False
 
-    def get(self, id_or_ids, default=None, order=False):
+    def get_id(self, id_or_ids, default=None, order=False):
         bulk = True
         if isinstance(id_or_ids, int) or isinstance(id_or_ids, str):
             id_or_ids = [id_or_ids]
@@ -93,9 +93,9 @@ class Session(Db, Ftp):
             del kwargs['load']
             result = super(Session, self).q(*args, **kwargs)
             locations = [row[load] for row in result]
-            values = self.get(locations)
+            values = self.get_id(locations)
             for idx in range(len(result)):
-                result[idx][load] = values.get(result[idx][load])
+                result[idx][load] = values.get_id(result[idx][load])
             return result
         else:
             return super(Session, self).q(*args, **kwargs)
@@ -156,24 +156,6 @@ class Session(Db, Ftp):
             return result[0]
         else:
             return result
-
-    def set(self, id_or_ids, value_or_values):
-        if isinstance(id_or_ids, int):
-            id_or_ids = [id_or_ids]
-            value_or_values = [value_or_values]
-
-        db = []
-        for id, value in zip(id_or_ids, value_or_values):
-            if int(id) < 0:
-                id_as_str = str(abs(id)).rjust(10, '0')
-                self.write(d(value), CONFIG['ftp']['folder'], join(id_as_str[0:3], id_as_str[3:6], id_as_str[6:10]))
-            else:
-                db.append(("(" + str(id) + ", compress(%s))", d(value)))
-
-        if db:
-            ids, blobs = zip(*db)
-            self.q("insert into blobs(id, val) values %s on duplicate key update val = values(val)" % ','.join(ids),
-                   args=(blobs,))
 
     def delete(self, id_or_ids):
         if isinstance(id_or_ids, int) or isinstance(id_or_ids, str):

@@ -78,7 +78,7 @@ def save_frame(folder, out, name):
 
 def create_video(image):
     with Session() as s:
-        item = s.take(f'exp2_{image}')
+        item = s.get(f'exp2_{image}')
 
     width = 64
     height = 64

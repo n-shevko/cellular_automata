@@ -78,7 +78,7 @@ def experiment_3(height, width, image):
         stop = round(loss_val, 3) <= 0.001
         if stop:
             with Session() as s:
-                s.update(f'exp3_{image}', {
+                s.set(f'exp3_{image}', {
                     'model': copy.deepcopy(model).to('cpu').state_dict(),
                     'loss': loss.item(),
                     'delta': datetime.now() - start,
@@ -89,7 +89,7 @@ def experiment_3(height, width, image):
 
 def damage_regeneratable(image):
     with Session() as s:
-        item = s.take(f'exp3_{image}')
+        item = s.get(f'exp3_{image}')
 
     width = 64
     height = 64

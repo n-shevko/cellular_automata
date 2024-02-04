@@ -59,7 +59,7 @@ def experiment_2(height, width, image):
         stop = round(loss_val, 3) <= 0.001
         if stop:
             with Session() as s:
-                s.update(f'exp2_{image}', {
+                s.set(f'exp2_{image}', {
                     'model': copy.deepcopy(model).to('cpu').state_dict(),
                     'loss': loss.item(),
                     'delta': datetime.now() - start,
@@ -73,7 +73,7 @@ def experiment_2(height, width, image):
 
 def damage_immortal(image):
     with Session() as s:
-        item = s.take(f'exp2_{image}')
+        item = s.get(f'exp2_{image}')
 
     width = 64
     height = 64

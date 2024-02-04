@@ -70,4 +70,4 @@ def loop(height, width, image, old):
             break
 
     with Session() as s:
-        s.update(f'exp1_1_{image}', store)
+        s.set(f'exp1_1_{image}', store)
